@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <title>FLIQ Runner — Explore the Neighborhood</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      overflow: hidden;
+      background: #0a0015;
+      font-family: 'Segoe UI', 'Arial Rounded MT Bold', Arial, sans-serif;
+      user-select: none;
+    }
+
+    #game-canvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    /* ── HUD ── */
+    #hud {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    #hud-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding: 14px 20px;
+    }
+
+    #fliq-coins {
+      color: #88ddff;
+      font-size: 1.2rem;
+      font-weight: 800;
+      text-shadow: 0 0 10px rgba(136,221,255,0.5), 0 2px 4px rgba(0,0,0,0.5);
+    }
+
+    #zone-name {
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 700;
+      text-shadow: 0 2px 6px rgba(0,0,0,0.5);
+      background: rgba(0,0,0,0.25);
+      padding: 4px 14px;
+      border-radius: 20px;
+    }
+
+    #chronicle-hint {
+      color: #aa88ff;
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    }
+
+    #powerup-indicator {
+      position: absolute;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(20,10,40,0.85);
+      color: #88ddff;
+      font-size: 1.1rem;
+      font-weight: 800;
+      padding: 10px 24px;
+      border-radius: 12px;
+      border: 2px solid #aa88ff;
+      box-shadow: 0 0 20px rgba(136,221,255,0.3);
+      transition: opacity 0.4s;
+    }
+
+    /* ── Overlay Screens ── */
+    .overlay-screen {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 30;
+      background: rgba(10, 5, 30, 0.92);
+    }
+
+    .screen-card {
+      background: linear-gradient(145deg, #1a0e35, #0d0620);
+      border-radius: 24px;
+      padding: 44px 52px;
+      text-align: center;
+      max-width: 520px;
+      width: 90%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+      border: 3px solid #aa88ff;
+    }
+
+    .screen-card h1 {
+      font-size: 2.4rem;
+      color: #88ddff;
+      margin-bottom: 8px;
+      text-shadow: 0 0 20px rgba(136,221,255,0.4);
+    }
+
+    .screen-card h2 {
+      font-size: 1.1rem;
+      color: #aa88ff;
+      margin-bottom: 14px;
+      font-weight: 600;
+    }
+
+    .screen-card p {
+      color: #ccc;
+      font-size: 0.95rem;
+      margin-bottom: 10px;
+      line-height: 1.6;
+    }
+
+    .controls-hint {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin: 14px 0 20px;
+    }
+
+    .controls-hint span {
+      background: rgba(136,221,255,0.1);
+      border: 1px solid rgba(136,221,255,0.3);
+      border-radius: 8px;
+      padding: 4px 10px;
+      font-size: 0.82rem;
+      color: #88ddff;
+      font-weight: 600;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #6644cc, #aa88ff);
+      color: #fff;
+      border: none;
+      border-radius: 14px;
+      padding: 14px 36px;
+      font-size: 1.1rem;
+      font-weight: 800;
+      cursor: pointer;
+      pointer-events: all;
+      letter-spacing: 0.5px;
+      box-shadow: 0 6px 20px rgba(170,136,255,0.4);
+      transition: transform 0.1s, box-shadow 0.1s;
+      margin-top: 8px;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(170,136,255,0.5);
+    }
+
+    .btn-primary:active { transform: translateY(0); }
+
+    /* ── Utility ── */
+    .hidden { display: none !important; }
+
+    @media (max-width: 768px) {
+      .screen-card { padding: 28px 24px; }
+      .screen-card h1 { font-size: 1.8rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 3D Canvas -->
+  <canvas id="game-canvas"></canvas>
+
+  <!-- HUD Layer -->
+  <div id="hud">
+    <div id="hud-top">
+      <div id="fliq-coins">✨ 0 Spark</div>
+      <div id="zone-name">The Neighborhood</div>
+      <div id="chronicle-hint">C — Chronicle</div>
+    </div>
+    <div id="hud-inventory" style="
+      position:absolute; bottom:120px; left:20px;
+      color:#ffdd44; font-size:14px; font-weight:700;
+      text-shadow:0 2px 4px rgba(0,0,0,0.5);
+      background:rgba(15,8,35,0.7); padding:6px 14px; border-radius:10px;
+      border:1px solid rgba(255,221,68,0.3);
+      pointer-events:none; display:none;
+    ">🎒</div>
+    <div id="powerup-indicator" class="hidden">Press E to interact</div>
+  </div>
+
+  <!-- ── Start Screen ── -->
+  <div id="start-screen" class="overlay-screen">
+    <div class="screen-card">
+      <h1>✨ FLIQ Runner</h1>
+      <h2>Explore the Neighborhood</h2>
+      <p>Explore a vibrant neighborhood full of mysteries! Follow glowing trails,
+         complete missions, discover hidden paths, and help your neighbors.
+         Collect Spark energy as you run, jump, and explore!</p>
+      <div class="controls-hint" id="controls-desktop">
+        <span>WASD / Arrows — Move</span>
+        <span>SHIFT — Sprint</span>
+        <span>SPACE — Jump</span>
+        <span>E — Interact</span>
+        <span>Scroll — Zoom</span>
+        <span>C — Chronicle</span>
+      </div>
+      <div class="controls-hint" id="controls-mobile" style="display:none;">
+        <span>Left Joystick — Move</span>
+        <span>RUN Button — Sprint</span>
+        <span>JUMP Button — Jump</span>
+        <span>E Button — Interact</span>
+        <span>Drag Right Side — Rotate</span>
+      </div>
+      <script>
+        if ('ontouchstart' in window) {
+          document.getElementById('controls-desktop').style.display = 'none';
+          document.getElementById('controls-mobile').style.display = '';
+        }
+      </script>
+      <button id="start-btn" class="btn-primary">▶ BEGIN EXPLORATION</button>
+    </div>
+  </div>
+
+  <!-- Import Map -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+      "cannon-es": "https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js"
+    }
+  }
+  </script>
+
+  <!-- Game Entry Point -->
+  <script type="module" src="game/main.js"></script>
+
+</body>
+</html>

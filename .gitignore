@@ -1,0 +1,14 @@
+node_modules/
+.tmp/
+.env
+credentials.json
+token.json
+*.zip
+# Uncompressed large GLBs (keep only optimized _opt versions)
+3d asset/Meshy_AI_bush_0323123756_texture.glb
+3d asset/Meshy_AI_fountain_0323123957_texture.glb
+3d asset/Meshy_AI_house1_0323123910_texture.glb
+3d asset/Meshy_AI_shop_0323123928_texture.glb
+3d asset/Meshy_AI_tree_0323123943_texture.glb
+3d asset/Meshy_AI_SAI_biped.zip
+.DS_Store
