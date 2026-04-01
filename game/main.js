@@ -27,13 +27,42 @@ const gpuTier = isMobile ? 'low' : 'high';
 
 // ── Renderer (tuned for device) ─────────────────────────────────
 const canvas   = document.getElementById('game-canvas');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: !isMobile });
+const renderer = new THREE.WebGLRenderer({
+  canvas,
+  antialias: !isMobile,
+  powerPreference: isMobile ? 'low-power' : 'high-performance',
+  failIfMajorPerformanceCaveat: false,
+});
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(isMobile ? 1 : Math.min(window.devicePixelRatio, 2));
-renderer.shadowMap.enabled = true;
+renderer.shadowMap.enabled = !isMobile; // Disable shadows on mobile (biggest GPU saver)
 renderer.shadowMap.type    = THREE.PCFSoftShadowMap;
 renderer.toneMapping       = THREE.LinearToneMapping;
 renderer.toneMappingExposure = 1.1;
+
+// ── WebGL context loss recovery (prevents mobile "disappearing" bug) ──
+canvas.addEventListener('webglcontextlost', (e) => {
+  e.preventDefault();
+  console.warn('[WebGL] Context lost — pausing render');
+  gameState.paused = true;
+  // Show recovery message
+  let msg = document.getElementById('_webgl_recovery');
+  if (!msg) {
+    msg = document.createElement('div');
+    msg.id = '_webgl_recovery';
+    msg.style.cssText = `position:fixed;top:0;left:0;width:100vw;height:100vh;
+      background:rgba(0,0,0,0.9);display:flex;align-items:center;justify-content:center;
+      z-index:9999;color:#88ddff;font-size:1.3rem;font-family:sans-serif;text-align:center;padding:20px;`;
+    msg.innerHTML = 'Recovering graphics...<br><small>Please wait a moment</small>';
+    document.body.appendChild(msg);
+  }
+});
+canvas.addEventListener('webglcontextrestored', () => {
+  console.log('[WebGL] Context restored — resuming');
+  const msg = document.getElementById('_webgl_recovery');
+  if (msg) msg.remove();
+  gameState.paused = false;
+});
 
 // ── Scene ────────────────────────────────────────────────────────
 const scene = new THREE.Scene();
@@ -41,23 +70,24 @@ scene.background = new THREE.Color(0x66ccff);
 scene.fog = new THREE.Fog(0x88ccff, isMobile ? 80 : 120, isMobile ? 180 : 280);
 
 // ── Camera ───────────────────────────────────────────────────────
-const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 400);
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, isMobile ? 200 : 400);
 
 // ── Lighting (reduced for mobile) ────────────────────────────────
 scene.add(new THREE.AmbientLight(0xffffff, 0.8));
 
-const shadowSize = isMobile ? 512 : 1024;
 const sun = new THREE.DirectionalLight(0xffffee, 1.5);
 sun.position.set(20, 30, 15);
-sun.castShadow            = true;
-sun.shadow.mapSize.width  = shadowSize;
-sun.shadow.mapSize.height = shadowSize;
-sun.shadow.camera.left    = -60;
-sun.shadow.camera.right   = 60;
-sun.shadow.camera.top     = 60;
-sun.shadow.camera.bottom  = -60;
-sun.shadow.camera.near    = 1;
-sun.shadow.camera.far     = 80;
+if (!isMobile) {
+  sun.castShadow            = true;
+  sun.shadow.mapSize.width  = 1024;
+  sun.shadow.mapSize.height = 1024;
+  sun.shadow.camera.left    = -60;
+  sun.shadow.camera.right   = 60;
+  sun.shadow.camera.top     = 60;
+  sun.shadow.camera.bottom  = -60;
+  sun.shadow.camera.near    = 1;
+  sun.shadow.camera.far     = 80;
+}
 scene.add(sun);
 
 scene.add(new THREE.HemisphereLight(0x88ddff, 0x44dd44, 0.8));
@@ -301,6 +331,38 @@ function showChronicle() {
 }
 
 // ── Start Button ─────────────────────────────────────────────────
+// ── Loading progress helper ──
+function updateLoading(pct, text) {
+  const bar = document.getElementById('loading-bar');
+  const txt = document.getElementById('loading-text');
+  if (bar) bar.style.width = Math.min(100, pct) + '%';
+  if (txt && text) txt.textContent = text;
+}
+
+function hideLoading() {
+  const el = document.getElementById('loading-screen');
+  if (el) {
+    el.style.transition = 'opacity 0.5s';
+    el.style.opacity = '0';
+    setTimeout(() => el.remove(), 500);
+  }
+}
+
+// ── Initial load: preload critical assets before showing start screen ──
+updateLoading(10, 'Initializing...');
+
+// Preload the world geometry (fast, code-only)
+setTimeout(() => {
+  updateLoading(40, 'Building world...');
+  setTimeout(() => {
+    updateLoading(70, 'Loading assets...');
+    setTimeout(() => {
+      updateLoading(100, 'Ready!');
+      setTimeout(() => hideLoading(), 300);
+    }, 500);
+  }, 300);
+}, 200);
+
 document.getElementById('start-btn').addEventListener('click', () => {
   try {
     gameState.started = true;
