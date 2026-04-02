@@ -44,6 +44,11 @@ export class ThirdPersonCamera {
       this._isLocked = document.pointerLockElement !== null;
     });
 
+    // ── Free mouse camera (Roblox-style — move mouse to rotate, no click needed) ──
+    this._lastMouseX = window.innerWidth / 2;
+    this._lastMouseY = window.innerHeight / 2;
+    this._mouseActive = false;
+
     document.addEventListener('mousemove', (e) => {
       // Pointer-lock rotation
       if (this._isLocked) {
@@ -52,30 +57,32 @@ export class ThirdPersonCamera {
         this.pitch  = Math.max(this.minPitch, Math.min(this.maxPitch, this.pitch));
         return;
       }
-      // Right-click drag rotation
-      if (this._isDragging) {
+
+      // Free camera: mouse movement rotates camera (no click needed)
+      if (this._mouseActive) {
         const dx = e.clientX - this._lastMouseX;
         const dy = e.clientY - this._lastMouseY;
-        this.yaw   -= dx * 0.005;
-        this.pitch  = Math.max(this.minPitch, Math.min(this.maxPitch, this.pitch - dy * 0.005));
-        this._lastMouseX = e.clientX;
-        this._lastMouseY = e.clientY;
-        e.preventDefault();
+        this.yaw   -= dx * 0.003;
+        this.pitch  = Math.max(this.minPitch, Math.min(this.maxPitch, this.pitch - dy * 0.003));
+      }
+      this._lastMouseX = e.clientX;
+      this._lastMouseY = e.clientY;
+    });
+
+    // Activate free camera after first click on canvas
+    document.addEventListener('click', (e) => {
+      if (e.target.tagName === 'CANVAS') {
+        this._mouseActive = true;
       }
     });
 
-    // ── Right-click drag ──
+    // Deactivate when clicking UI elements
     document.addEventListener('mousedown', (e) => {
-      if (e.button === 2) {
-        this._isDragging = true;
-        this._lastMouseX = e.clientX;
-        this._lastMouseY = e.clientY;
-        e.preventDefault();
+      if (e.target.tagName !== 'CANVAS') {
+        this._mouseActive = false;
       }
     });
-    document.addEventListener('mouseup', (e) => {
-      if (e.button === 2) this._isDragging = false;
-    });
+
     document.addEventListener('contextmenu', (e) => e.preventDefault());
 
     // ── Mouse-wheel zoom ──
