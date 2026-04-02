@@ -61,7 +61,7 @@ export class EffectsManager {
      AMBIENT FLOATING PARTICLES — magical sparkles drifting in air
      ═══════════════════════════════════════════════════════════════ */
   _initAmbientParticles() {
-    const count = isMobile ? 60 : 150;
+    const count = isMobile ? 20 : 150;
     const geo = new THREE.SphereGeometry(0.08, 4, 4);
     const mat = new THREE.MeshBasicMaterial({
       color: 0xFFEEAA, transparent: true, opacity: 0.6,
@@ -204,7 +204,7 @@ export class EffectsManager {
       this._energyTrails.push({ mesh: ribbon, mat, phase: Math.random() * Math.PI * 2, colorData });
 
       // Glowing dots along the trail — bigger and brighter
-      const dotCount = isMobile ? 6 : 12;
+      const dotCount = isMobile ? 3 : 12;
       const dotGeo = new THREE.SphereGeometry(0.2, 6, 6);
 
       for (let i = 0; i < dotCount; i++) {

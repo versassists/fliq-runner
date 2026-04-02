@@ -166,7 +166,7 @@ function loadWorld() {
   });
 
   // Scatter Spark orbs around the neighborhood
-  sparks.scatterOrbs(70, 65); // 70 orbs within radius 65 — spread across the expanded neighborhood
+  sparks.scatterOrbs(isMobile ? 30 : 70, 65);
 
   // Set spawn
   const sp = { x: 0, y: 1, z: 10 };

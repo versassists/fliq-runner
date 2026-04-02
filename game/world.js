@@ -127,6 +127,9 @@ export class WorldBuilder {
     this._createFlowingPaths();
     this._createCentralPlaza();
 
+    // ── Terrain depth (gentle elevation changes) ──
+    this._createTerrainDepth();
+
     // ── World elements ──
     this._createNeighborhoodBuildings();
     this._createStreetLamps();
@@ -146,6 +149,70 @@ export class WorldBuilder {
     if (levelData.platforms) {
       for (const p of levelData.platforms) this._addPlatform(...p);
     }
+  }
+
+  /* ═══════════════════════════════════════════════════
+     TERRAIN DEPTH — Gentle elevation changes for natural feel
+     95% flat, small raised areas near buildings and along edges
+     ═══════════════════════════════════════════════════ */
+  _createTerrainDepth() {
+    const bumpMat = new THREE.MeshStandardMaterial({
+      color: 0x6AAF5C, roughness: 0.9,
+    });
+
+    // Gentle mounds near key locations
+    const mounds = [
+      // Raised area under house (0, -52) — sits on small hill
+      { x: 0, z: -52, r: 6, h: 1.2 },
+      // Slight rise near garden (25, -25)
+      { x: 25, z: -25, r: 5, h: 0.8 },
+      // Rise near community hub (12, -12)
+      { x: 12, z: -12, r: 7, h: 1.0 },
+      // Gentle bump near toy store (30, 30)
+      { x: 30, z: 30, r: 5, h: 0.6 },
+      // Rise near recipe workshop (-30, 30)
+      { x: -30, z: 28, r: 5, h: 0.7 },
+      // Rolling terrain at edges
+      { x: -45, z: 0, r: 8, h: 1.5 },
+      { x: 45, z: 0, r: 7, h: 1.0 },
+      { x: 0, z: 45, r: 6, h: 0.9 },
+      { x: 0, z: -42, r: 5, h: 0.7 },
+      // Small bumps scattered for variety
+      { x: -20, z: -38, r: 4, h: 0.5 },
+      { x: 35, z: -15, r: 3.5, h: 0.4 },
+      { x: -15, z: 20, r: 4, h: 0.5 },
+    ];
+
+    const moundList = isMobile ? mounds.slice(0, 5) : mounds;
+
+    for (const m of moundList) {
+      // Flattened half-sphere for natural terrain bump
+      const geo = new THREE.SphereGeometry(m.r, isMobile ? 8 : 12, 6, 0, Math.PI * 2, 0, Math.PI / 2);
+      const mesh = new THREE.Mesh(geo, bumpMat);
+      mesh.scale.y = m.h / m.r; // flatten
+      mesh.position.set(m.x, 0, m.z);
+      mesh.receiveShadow = true;
+      this.scene.add(mesh);
+      this._meshes.push(mesh);
+    }
+
+    // Small ramp/steps near the arcade (-30, -52)
+    const rampGeo = new THREE.BoxGeometry(4, 0.4, 2);
+    const rampMat = new THREE.MeshStandardMaterial({ color: 0xCCBBA8, roughness: 0.7 });
+    const ramp = new THREE.Mesh(rampGeo, rampMat);
+    ramp.position.set(-30, 0.2, -48);
+    ramp.rotation.x = -0.15; // slight angle
+    ramp.receiveShadow = true;
+    this.scene.add(ramp);
+    this._meshes.push(ramp);
+
+    // Add physics for the ramp
+    const rampBody = new CANNON.Body({ mass: 0 });
+    rampBody.addShape(new CANNON.Box(new CANNON.Vec3(2, 0.2, 1)));
+    rampBody.position.set(-30, 0.2, -48);
+    rampBody.quaternion.setFromEuler(-0.15, 0, 0);
+    this.physicsWorld.addBody(rampBody);
+    this._bodies.push(rampBody);
   }
 
   /* ═══════════════════════════════════════════════════
@@ -561,7 +628,7 @@ export class WorldBuilder {
   }
 
   _createGrassSparkles() {
-    const count = isMobile ? 60 : 150;
+    const count = isMobile ? 20 : 150;
     const sparkleGeo = new THREE.BufferGeometry();
     const sparklePositions = new Float32Array(count * 3);
 
@@ -687,7 +754,7 @@ export class WorldBuilder {
      HILLS & MOUNTAINS — Scattered around outer areas
      ═══════════════════════════════════════════════════ */
   _createHills() {
-    const hills = [
+    const allHills = [
       // Large mountains in the far background
       { x: -85, z: -70, r: 18, h: 22, mat: hillGrassMat, snow: true },
       { x:  90, z: -80, r: 15, h: 18, mat: hillDarkMat,  snow: true },
@@ -709,6 +776,8 @@ export class WorldBuilder {
       { x: -95, z:   0, r: 12, h: 15, mat: hillGrassMat, snow: true },
       { x:  95, z:   0, r: 13, h: 16, mat: hillDarkMat, snow: true },
     ];
+    // Mobile: only large mountains (first 4) for background depth
+    const hills = isMobile ? allHills.slice(0, 4) : allHills;
 
     for (const hill of hills) {
       const group = new THREE.Group();
@@ -865,7 +934,7 @@ export class WorldBuilder {
      GRASS — GLB models (grass1.glb) scattered around
      ═══════════════════════════════════════════════════ */
   _createBushes() {
-    const grassTarget = isMobile ? 8 : 16; // Reduced count for large CFG GLBs
+    const grassTarget = isMobile ? 4 : 16; // Minimal on mobile
     const grassPositions = [];
     // Keep generating until we have enough that avoid roads
     let attempts = 0;
@@ -932,11 +1001,12 @@ export class WorldBuilder {
   _createTrees() {
     // All candidate positions — filter out any on main roads (|x| < 7 or |z| < 7)
     // Reduced tree count for large CFG GLBs — key positions only
-    const treePositions = [
+    const allTreePos = [
       { x: -12, z: -12 }, { x: 12, z: -12 }, { x: -12, z: 12 }, { x: 12, z: 12 },
       { x: -28, z: 10 }, { x: 28, z: 10 }, { x: 10, z: -28 }, { x: 10, z: 28 },
       { x: -25, z: -25 }, { x: 25, z: -25 }, { x: -25, z: 25 }, { x: 25, z: 25 },
     ].filter(p => !(Math.abs(p.x) < 8 && Math.abs(p.z) < 8));
+    const treePositions = isMobile ? allTreePos.slice(0, 4) : allTreePos;
 
     const targetHeight = 5;
 
@@ -1032,11 +1102,11 @@ export class WorldBuilder {
      TRAMPOLINES — Keep as groups (have physics bodies)
      ═══════════════════════════════════════════════════ */
   _createTrampolines() {
-    // Trampolines scattered in grass areas (off paths)
-    const positions = [
+    const allTrampolines = [
       { x: 20, z: -32 }, { x: -18, z: 28 }, { x: -26, z: -36 }, { x: 30, z: 18 },
       { x: 12, z: 38 }, { x: -36, z: -10 },
     ];
+    const positions = isMobile ? allTrampolines.slice(0, 2) : allTrampolines;
 
     for (const pos of positions) {
       const group = new THREE.Group();
@@ -1223,7 +1293,7 @@ export class WorldBuilder {
      ROCKS — Scattered around landscape for natural feel
      ═══════════════════════════════════════════════════ */
   _createRocks() {
-    const rockSpots = [
+    const allSpots = [
       { x: -18, z: -20, s: 2, ry: 0.3 },
       { x: 22, z: -35, s: 1.5, ry: 1.2 },
       { x: -35, z: 15, s: 2.5, ry: 2.1 },
@@ -1233,6 +1303,7 @@ export class WorldBuilder {
       { x: -42, z: -25, s: 1.6, ry: 0.6 },
       { x: 15, z: -42, s: 2.2, ry: 2.4 },
     ];
+    const rockSpots = isMobile ? allSpots.slice(0, 3) : allSpots;
 
     const placeRock = async () => {
       for (const spot of rockSpots) {
@@ -1257,7 +1328,7 @@ export class WorldBuilder {
      FENCES — Around garden and house areas
      ═══════════════════════════════════════════════════ */
   _createFences() {
-    // Fence segments around the garden (25, -25) and house (0, -52)
+    if (isMobile) return; // Skip fences on mobile to save GPU
     const fenceSpots = [
       // Garden perimeter
       { x: 20, z: -22, ry: 0, s: 2 },
@@ -1331,6 +1402,7 @@ export class WorldBuilder {
      DISTANT BUILDINGS — Background silhouettes for depth
      ═══════════════════════════════════════════════════ */
   _createDistantBuildings() {
+    if (isMobile) return; // Skip distant buildings on mobile — too many GLB loads
     const spots = [
       { x: -75, z: -55, s: 12, ry: 0.4 },
       { x: -70, z: -48, s: 9, ry: -0.3 },

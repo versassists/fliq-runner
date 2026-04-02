@@ -71,6 +71,26 @@ export class Player {
     this.shieldMesh.visible = false;
     this.group.add(this.shieldMesh);
 
+    // ── Shoe glow — FLIQ Runner signature (glows when moving) ──
+    const shoeGlowGeo = new THREE.RingGeometry(0.15, 0.45, 16);
+    const shoeGlowMat = new THREE.MeshBasicMaterial({
+      color: 0x44EEDD, transparent: true, opacity: 0.0, side: THREE.DoubleSide,
+    });
+    this._shoeGlow = new THREE.Mesh(shoeGlowGeo, shoeGlowMat);
+    this._shoeGlow.rotation.x = -Math.PI / 2;
+    this._shoeGlow.position.y = -0.85; // at feet level
+    this.group.add(this._shoeGlow);
+
+    // Secondary outer glow ring (larger, dimmer)
+    const shoeGlowOuter = new THREE.RingGeometry(0.4, 0.7, 16);
+    const shoeGlowOuterMat = new THREE.MeshBasicMaterial({
+      color: 0x33CCBB, transparent: true, opacity: 0.0, side: THREE.DoubleSide,
+    });
+    this._shoeGlowOuter = new THREE.Mesh(shoeGlowOuter, shoeGlowOuterMat);
+    this._shoeGlowOuter.rotation.x = -Math.PI / 2;
+    this._shoeGlowOuter.position.y = -0.85;
+    this.group.add(this._shoeGlowOuter);
+
     // ── Sprint VFX — speed aura + trail particles ──
     // Glow aura ring
     const sprintAuraGeo = new THREE.RingGeometry(0.3, 0.6, 16);
@@ -548,6 +568,31 @@ export class Player {
         p.active = false;
         p.mesh.visible = false;
       }
+    }
+
+    // ── Shoe glow — intensifies when moving, pulses when sprinting ──
+    if (this._shoeGlow) {
+      const isMovingNow = this.state === PlayerState.WALKING || this.state === PlayerState.SPRINTING;
+      const t = Date.now() * 0.004;
+      let targetOpacity = 0;
+      let outerOpacity = 0;
+
+      if (this.state === PlayerState.SPRINTING) {
+        // Bright pulsing glow when sprinting
+        targetOpacity = 0.6 + Math.sin(t * 2) * 0.2;
+        outerOpacity = 0.3 + Math.sin(t * 2) * 0.1;
+        this._shoeGlow.material.color.setHex(0x66FFEE); // brighter cyan
+      } else if (isMovingNow) {
+        // Steady glow when running
+        targetOpacity = 0.35 + Math.sin(t) * 0.1;
+        outerOpacity = 0.15;
+        this._shoeGlow.material.color.setHex(0x44EEDD);
+      }
+      // Smooth transition
+      this._shoeGlow.material.opacity += (targetOpacity - this._shoeGlow.material.opacity) * 0.1;
+      this._shoeGlowOuter.material.opacity += (outerOpacity - this._shoeGlowOuter.material.opacity) * 0.1;
+      // Rotate for shimmer
+      this._shoeGlow.rotation.z += 0.02;
     }
 
     // ── Shield pulse ──
