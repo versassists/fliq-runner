@@ -5,7 +5,7 @@
  */
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { loadTree1Model, loadTree2Model, loadGrassModel, loadHouseModel, loadShopModel, loadRockModel, loadFenceModel, loadCommunityHubModel, loadDistantBuildingModel } from './modelLoader.js';
+import { loadHouseModel, loadShopModel, loadCommunityHubModel } from './modelLoader.js';
 import {
   grassMat, grassOuterMat, sidewalkMat, woodMat, darkWoodMat,
   metalMat, metalLightMat, stoneMat, stoneGrayMat, trunkMat,
@@ -140,34 +140,25 @@ export class WorldBuilder {
   }
 
   async _loadAssetsStaggered() {
-    // Queue of asset loaders — each runs after the previous finishes
-    // This prevents 30+ simultaneous GLB fetches that choke the browser
-    const queue = [];
-
-    // Priority 1: Main buildings (player sees these first)
-    queue.push(() => this._createNeighborhoodBuildings());
-
-    // Priority 2: Trees (most visible vegetation)
-    queue.push(() => this._createTrees());
-
-    // Priority 3: Bushes
-    queue.push(() => this._createBushes());
-
-    // Desktop only — lower priority assets
+    // Procedural assets (instant, no GLB needed)
+    this._createTrees();       // InstancedMesh — 2 draw calls
+    this._createBushes();      // InstancedMesh — 1 draw call
+    this._createRocks();       // InstancedMesh — 1 draw call
     if (!isMobile) {
-      queue.push(() => this._createRocks());
-      queue.push(() => this._createFences());
-      queue.push(() => this._createCommunityHub());
-      queue.push(() => this._createDistantBuildings());
+      this._createFences();    // InstancedMesh — 2 draw calls
+      this._createDistantBuildings(); // InstancedMesh — 1 draw call
     }
 
-    // Run sequentially with small delays to let renderer breathe
-    for (const loader of queue) {
-      loader();
-      // Give browser 100ms to render/GC between batches
+    // GLB assets (only 2-3 models — staggered)
+    await new Promise(r => setTimeout(r, 50));
+    this._createNeighborhoodBuildings(); // 2 GLBs: house + shop
+
+    if (!isMobile) {
       await new Promise(r => setTimeout(r, 100));
+      this._createCommunityHub(); // 1 GLB
     }
-    console.log('[World] All assets loaded (staggered)');
+
+    console.log('[World] All assets loaded — GLBs: ' + (isMobile ? '2' : '3'));
   }
 
   /* ═══════════════════════════════════════════════════
@@ -950,143 +941,86 @@ export class WorldBuilder {
   }
 
   /* ═══════════════════════════════════════════════════
-     GRASS — GLB models (grass1.glb) scattered around
+     BUSHES — InstancedMesh (procedural, 1 draw call for all)
      ═══════════════════════════════════════════════════ */
   _createBushes() {
-    const grassTarget = isMobile ? 4 : 10; // Reduced for performance
-    const grassPositions = [];
-    // Keep generating until we have enough that avoid roads
+    const count = isMobile ? 6 : 16;
+    const positions = [];
     let attempts = 0;
-    while (grassPositions.length < grassTarget && attempts < 500) {
+    while (positions.length < count && attempts < 500) {
       attempts++;
       const angle = Math.random() * Math.PI * 2;
-      const dist = 12 + Math.random() * 55;
+      const dist = 12 + Math.random() * 50;
       const x = Math.cos(angle) * dist;
       const z = Math.sin(angle) * dist;
-      // Skip if too close to center plaza
       if (Math.abs(x) < 8 && Math.abs(z) < 8) continue;
-      grassPositions.push({
-        x, z,
-        scale: 1.5 + Math.random() * 2,
-        ry: Math.random() * Math.PI * 2,
-      });
+      positions.push({ x, z, s: 0.8 + Math.random() * 1.2 });
     }
-    const grassCount = grassPositions.length;
 
-    loadGrassModel().then((grassModel) => {
-      if (!grassModel) {
-        // Fallback: simple green spheres
-        const sphereGeo = new THREE.SphereGeometry(0.5, 6, 6);
-        const mat = bushMats[0];
-        const im = new THREE.InstancedMesh(sphereGeo, mat, grassCount);
-        im.castShadow = !isMobile;
-        for (let i = 0; i < grassCount; i++) {
-          const g = grassPositions[i];
-          _dummy.position.set(g.x, 0.3, g.z);
-          _dummy.scale.setScalar(g.scale * 0.3);
-          _dummy.updateMatrix();
-          im.setMatrixAt(i, _dummy.matrix);
-        }
-        this.scene.add(im);
-        this._instancedMeshes.push(im);
-        return;
-      }
+    // Single InstancedMesh = 1 draw call for ALL bushes
+    const bushGeo = new THREE.SphereGeometry(1, 8, 6);
+    const bushMat = new THREE.MeshStandardMaterial({ color: 0x55AA44, roughness: 0.85 });
+    const im = new THREE.InstancedMesh(bushGeo, bushMat, count);
+    im.castShadow = !isMobile;
+    im.receiveShadow = true;
 
-      // Measure the GLB once for scaling
-      const box = new THREE.Box3().setFromObject(grassModel);
-      const size = box.getSize(new THREE.Vector3());
-      const baseScale = 1 / (Math.max(size.x, size.y, size.z) || 1);
-
-      for (const g of grassPositions) {
-        loadGrassModel().then((clone) => {
-          if (!clone) return;
-          const s = baseScale * g.scale;
-          clone.scale.setScalar(s);
-          // Place on ground
-          const b = new THREE.Box3().setFromObject(clone);
-          clone.position.set(g.x, -b.min.y * s, g.z);
-          clone.rotation.y = g.ry;
-          this.scene.add(clone);
-          this._meshes.push(clone);
-        });
-      }
-      console.log(`[Grass] Placing ${grassCount} grass clumps`);
-    });
+    for (let i = 0; i < positions.length; i++) {
+      const p = positions[i];
+      _dummy.position.set(p.x, p.s * 0.4, p.z);
+      _dummy.scale.set(p.s, p.s * 0.6, p.s);
+      _dummy.updateMatrix();
+      im.setMatrixAt(i, _dummy.matrix);
+    }
+    this.scene.add(im);
+    this._instancedMeshes.push(im);
   }
 
   /* ═══════════════════════════════════════════════════
-     TREES — GLB models (tree1.glb + tree2.glb)
+     TREES — InstancedMesh (procedural, 2 draw calls total)
      ═══════════════════════════════════════════════════ */
   _createTrees() {
-    // All candidate positions — filter out any on main roads (|x| < 7 or |z| < 7)
-    // Reduced tree count for large CFG GLBs — key positions only
     const allTreePos = [
       { x: -12, z: -12 }, { x: 12, z: -12 }, { x: -12, z: 12 }, { x: 12, z: 12 },
       { x: -28, z: 10 }, { x: 28, z: 10 }, { x: 10, z: -28 }, { x: 10, z: 28 },
       { x: -25, z: -25 }, { x: 32, z: -20 }, { x: -25, z: 25 }, { x: 25, z: 25 },
+      { x: -40, z: -15 }, { x: 40, z: 20 }, { x: -18, z: 40 }, { x: 18, z: -40 },
     ].filter(p => !(Math.abs(p.x) < 8 && Math.abs(p.z) < 8));
-    const treePositions = isMobile ? allTreePos.slice(0, 4) : allTreePos.slice(0, 8);
+    const treePositions = isMobile ? allTreePos.slice(0, 6) : allTreePos;
+    const count = treePositions.length;
 
-    const targetHeight = 5;
+    // Trunk InstancedMesh (1 draw call)
+    const trunkGeo = new THREE.CylinderGeometry(0.2, 0.35, 3, 6);
+    const im_trunk = new THREE.InstancedMesh(trunkGeo, trunkMat, count);
+    im_trunk.castShadow = !isMobile;
 
-    // Helper to place a single GLB tree
-    const placeTree = (model, pos, scale, rotY) => {
-      const box = new THREE.Box3().setFromObject(model);
-      const sz = box.getSize(new THREE.Vector3());
-      const s = (targetHeight * scale) / (sz.y || 1);
-      model.scale.setScalar(s);
-      const box2 = new THREE.Box3().setFromObject(model);
-      const center = box2.getCenter(new THREE.Vector3());
-      model.position.set(pos.x - center.x + pos.x, -box2.min.y, pos.z - center.z + pos.z);
-      model.position.x = pos.x;
-      model.position.z = pos.z;
-      model.rotation.y = rotY;
-      this.scene.add(model);
-      this._meshes.push(model);
-    };
+    // Canopy InstancedMesh (1 draw call) — clustered sphere look
+    const canopyGeo = new THREE.SphereGeometry(1.8, isMobile ? 6 : 8, isMobile ? 6 : 8);
+    const canopyMat = new THREE.MeshStandardMaterial({ color: 0x44AA33, roughness: 0.85 });
+    const im_canopy = new THREE.InstancedMesh(canopyGeo, canopyMat, count);
+    im_canopy.castShadow = !isMobile;
+    im_canopy.receiveShadow = true;
 
-    // Load both tree types, then place alternating
-    Promise.all([loadTree1Model(), loadTree2Model()]).then(([t1, t2]) => {
-      const hasT1 = !!t1;
-      const hasT2 = !!t2;
+    for (let i = 0; i < count; i++) {
+      const p = treePositions[i];
+      const s = 0.8 + Math.random() * 0.6;
 
-      if (!hasT1 && !hasT2) {
-        // Fallback: procedural trees
-        console.warn('[Trees] No GLB trees loaded, using fallback');
-        const trunkGeo = new THREE.CylinderGeometry(0.2, 0.3, 2.5, 6);
-        const canopyGeo = new THREE.SphereGeometry(1.2, 6, 6);
-        for (const p of treePositions) {
-          const group = new THREE.Group();
-          const trunk = new THREE.Mesh(trunkGeo, trunkMat);
-          trunk.position.y = 1.25;
-          trunk.castShadow = !isMobile;
-          group.add(trunk);
-          const canopy = new THREE.Mesh(canopyGeo, canopyMats[0]);
-          canopy.position.y = 3.5;
-          canopy.castShadow = !isMobile;
-          group.add(canopy);
-          group.position.set(p.x, 0, p.z);
-          this.scene.add(group);
-          this._meshes.push(group);
-        }
-        return;
-      }
+      // Trunk
+      _dummy.position.set(p.x, 1.5 * s, p.z);
+      _dummy.scale.set(s, s, s);
+      _dummy.updateMatrix();
+      im_trunk.setMatrixAt(i, _dummy.matrix);
 
-      // Place trees alternating between tree1 and tree2
-      const placeAll = async () => {
-        for (let i = 0; i < treePositions.length; i++) {
-          const useT1 = (i % 2 === 0 && hasT1) || !hasT2;
-          const loader = useT1 ? loadTree1Model : loadTree2Model;
-          const clone = await loader();
-          if (!clone) continue;
-          const scale = 0.8 + Math.random() * 0.5;
-          const rotY = Math.random() * Math.PI * 2;
-          placeTree(clone, treePositions[i], scale, rotY);
-        }
-        console.log(`[Trees] Placed ${treePositions.length} GLB trees`);
-      };
-      placeAll();
-    });
+      // Canopy (above trunk)
+      _dummy.position.set(p.x, 3.5 * s, p.z);
+      _dummy.scale.set(s * 1.1, s * 0.9, s * 1.1);
+      _dummy.updateMatrix();
+      im_canopy.setMatrixAt(i, _dummy.matrix);
+    }
+
+    this.scene.add(im_trunk);
+    this.scene.add(im_canopy);
+    this._instancedMeshes.push(im_trunk, im_canopy);
+    console.log(`[Trees] ${count} trees (2 draw calls via InstancedMesh)`);
   }
 
   /* ═══════════════════════════════════════════════════
@@ -1314,71 +1248,83 @@ export class WorldBuilder {
      ═══════════════════════════════════════════════════ */
   _createRocks() {
     const allSpots = [
-      { x: -18, z: -20, s: 2, ry: 0.3 },
-      { x: 22, z: -35, s: 1.5, ry: 1.2 },
-      { x: -35, z: 15, s: 2.5, ry: 2.1 },
-      { x: 30, z: 38, s: 1.8, ry: 0.8 },
-      { x: -12, z: 35, s: 1.2, ry: 3.0 },
-      { x: 40, z: -15, s: 2.0, ry: 1.5 },
-      { x: -42, z: -25, s: 1.6, ry: 0.6 },
-      { x: 15, z: -42, s: 2.2, ry: 2.4 },
+      { x: -18, z: -20, s: 1.5 }, { x: 22, z: -35, s: 1.2 },
+      { x: -35, z: 15, s: 1.8 }, { x: 30, z: 38, s: 1.4 },
+      { x: -12, z: 35, s: 1.0 }, { x: 40, z: -15, s: 1.5 },
+      { x: -42, z: -25, s: 1.2 }, { x: 15, z: -42, s: 1.6 },
     ];
-    const rockSpots = isMobile ? allSpots.slice(0, 3) : allSpots.slice(0, 5);
+    const spots = isMobile ? allSpots.slice(0, 4) : allSpots;
 
-    const placeRock = async () => {
-      for (const spot of rockSpots) {
-        const model = await loadRockModel();
-        if (!model) continue;
-        const box = new THREE.Box3().setFromObject(model);
-        const sz = box.getSize(new THREE.Vector3());
-        const scale = spot.s / (sz.y || 1);
-        model.scale.setScalar(scale);
-        const box2 = new THREE.Box3().setFromObject(model);
-        model.position.set(spot.x, -box2.min.y, spot.z);
-        model.rotation.y = spot.ry;
-        this.scene.add(model);
-        this._meshes.push(model);
-      }
-      console.log(`[Rocks] Placed ${rockSpots.length} rocks`);
-    };
-    placeRock();
+    // Procedural rocks — 1 draw call via InstancedMesh
+    const rockGeo = new THREE.DodecahedronGeometry(1, 0);
+    const rockMat = new THREE.MeshStandardMaterial({ color: 0x998877, roughness: 0.9 });
+    const im = new THREE.InstancedMesh(rockGeo, rockMat, spots.length);
+    im.castShadow = !isMobile;
+    im.receiveShadow = true;
+
+    for (let i = 0; i < spots.length; i++) {
+      const s = spots[i];
+      _dummy.position.set(s.x, s.s * 0.3, s.z);
+      _dummy.scale.set(s.s, s.s * 0.6, s.s);
+      _dummy.updateMatrix();
+      im.setMatrixAt(i, _dummy.matrix);
+    }
+    this.scene.add(im);
+    this._instancedMeshes.push(im);
   }
 
   /* ═══════════════════════════════════════════════════
      FENCES — Around garden and house areas
      ═══════════════════════════════════════════════════ */
   _createFences() {
-    if (isMobile) return; // Skip fences on mobile to save GPU
-    const fenceSpots = [
-      // Garden front + back only (reduced from 15 to 8 for performance)
-      { x: 18, z: -19, ry: 0, s: 2.5 },
-      { x: 25, z: -19, ry: 0, s: 2.5 },
-      { x: 32, z: -19, ry: 0, s: 2.5 },
-      { x: 18, z: -31, ry: 0, s: 2.5 },
-      { x: 25, z: -31, ry: 0, s: 2.5 },
-      { x: 32, z: -31, ry: 0, s: 2.5 },
-      // House yard (reduced to 2)
-      { x: -2, z: -49, ry: 0, s: 2.0 },
-      { x: 2, z: -49, ry: 0, s: 2.0 },
-    ];
+    if (isMobile) return;
+    // Procedural fence posts + rails — InstancedMesh (2 draw calls)
+    const fenceMat = new THREE.MeshStandardMaterial({ color: 0x8B6B4A, roughness: 0.8 });
+    const postGeo = new THREE.CylinderGeometry(0.08, 0.1, 1.2, 5);
+    const railGeo = new THREE.BoxGeometry(3, 0.1, 0.08);
 
-    const placeFences = async () => {
-      for (const spot of fenceSpots) {
-        const model = await loadFenceModel();
-        if (!model) continue;
-        const box = new THREE.Box3().setFromObject(model);
-        const sz = box.getSize(new THREE.Vector3());
-        const scale = spot.s / (Math.max(sz.x, sz.z) || 1);
-        model.scale.setScalar(scale);
-        const box2 = new THREE.Box3().setFromObject(model);
-        model.position.set(spot.x, -box2.min.y, spot.z);
-        model.rotation.y = spot.ry;
-        this.scene.add(model);
-        this._meshes.push(model);
-      }
-      console.log(`[Fences] Placed ${fenceSpots.length} fence segments`);
-    };
-    placeFences();
+    // Garden perimeter posts
+    const postPositions = [];
+    for (let x = 17; x <= 33; x += 4) {
+      postPositions.push({ x, z: -19 }, { x, z: -31 });
+    }
+    // Side posts
+    for (let z = -22; z >= -28; z -= 3) {
+      postPositions.push({ x: 16, z }, { x: 34, z });
+    }
+    // House yard
+    postPositions.push({ x: -3, z: -49 }, { x: 0, z: -49 }, { x: 3, z: -49 });
+
+    const postIM = new THREE.InstancedMesh(postGeo, fenceMat, postPositions.length);
+    for (let i = 0; i < postPositions.length; i++) {
+      _dummy.position.set(postPositions[i].x, 0.6, postPositions[i].z);
+      _dummy.scale.setScalar(1);
+      _dummy.updateMatrix();
+      postIM.setMatrixAt(i, _dummy.matrix);
+    }
+    this.scene.add(postIM);
+    this._instancedMeshes.push(postIM);
+
+    // Rails along garden front and back
+    const rails = [
+      { x: 25, z: -19 }, { x: 25, z: -31 },
+      { x: -1, z: -49 },
+    ];
+    const railIM = new THREE.InstancedMesh(railGeo, fenceMat, rails.length * 2);
+    let ri = 0;
+    for (const r of rails) {
+      // Top rail
+      _dummy.position.set(r.x, 0.9, r.z);
+      _dummy.scale.set(2.5, 1, 1);
+      _dummy.updateMatrix();
+      railIM.setMatrixAt(ri++, _dummy.matrix);
+      // Bottom rail
+      _dummy.position.set(r.x, 0.4, r.z);
+      _dummy.updateMatrix();
+      railIM.setMatrixAt(ri++, _dummy.matrix);
+    }
+    this.scene.add(railIM);
+    this._instancedMeshes.push(railIM);
   }
 
   /* ═══════════════════════════════════════════════════
@@ -1416,40 +1362,29 @@ export class WorldBuilder {
      DISTANT BUILDINGS — Background silhouettes for depth
      ═══════════════════════════════════════════════════ */
   _createDistantBuildings() {
-    if (isMobile) return; // Skip distant buildings on mobile
-    // Reduced from 12 to 4 for performance (each is a GLB clone)
+    if (isMobile) return;
+    // Procedural distant buildings — InstancedMesh (1 draw call)
     const spots = [
-      { x: -75, z: -55, s: 12, ry: 0.4 },
-      { x: 75, z: -50, s: 14, ry: 0.7 },
-      { x: -72, z: 50, s: 11, ry: 0.2 },
-      { x: 70, z: 55, s: 13, ry: -0.4 },
+      { x: -75, z: -55, h: 12, w: 6 }, { x: -68, z: -48, h: 8, w: 5 },
+      { x: 75, z: -50, h: 14, w: 7 }, { x: 82, z: -42, h: 9, w: 5 },
+      { x: -72, z: 50, h: 11, w: 6 }, { x: 70, z: 55, h: 13, w: 6 },
+      { x: -55, z: -72, h: 10, w: 5 }, { x: 55, z: 72, h: 10, w: 5 },
     ];
+    const distMat = new THREE.MeshStandardMaterial({
+      color: 0xAABBCC, roughness: 0.7, transparent: true, opacity: 0.6,
+    });
+    const boxGeo = new THREE.BoxGeometry(1, 1, 1);
+    const im = new THREE.InstancedMesh(boxGeo, distMat, spots.length);
 
-    const placeDistant = async () => {
-      for (const spot of spots) {
-        const model = await loadDistantBuildingModel();
-        if (!model) continue;
-        const box = new THREE.Box3().setFromObject(model);
-        const sz = box.getSize(new THREE.Vector3());
-        const scale = spot.s / (sz.y || 1);
-        model.scale.setScalar(scale);
-        const box2 = new THREE.Box3().setFromObject(model);
-        model.position.set(spot.x, -box2.min.y, spot.z);
-        model.rotation.y = spot.ry;
-        // Make distant buildings slightly transparent for depth
-        model.traverse((child) => {
-          if (child.isMesh && child.material) {
-            child.material = child.material.clone();
-            child.material.transparent = true;
-            child.material.opacity = 0.7;
-          }
-        });
-        this.scene.add(model);
-        this._meshes.push(model);
-      }
-      console.log(`[DistantBuildings] Placed ${spots.length} background buildings`);
-    };
-    placeDistant();
+    for (let i = 0; i < spots.length; i++) {
+      const s = spots[i];
+      _dummy.position.set(s.x, s.h / 2, s.z);
+      _dummy.scale.set(s.w, s.h, s.w);
+      _dummy.updateMatrix();
+      im.setMatrixAt(i, _dummy.matrix);
+    }
+    this.scene.add(im);
+    this._instancedMeshes.push(im);
   }
 
   /* ═══════════════════════════════════════════════════
