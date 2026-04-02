@@ -42,8 +42,8 @@ export const COLORS = {
 // ── Physics Constants ────────────────────────────────────────────
 export const PHYSICS = {
   GRAVITY:          -40,    // Roblox uses ~196.2 studs/s² ≈ heavier gravity for snappy jumps
-  WALK_SPEED:        55,
-  SPRINT_SPEED:      72,
+  WALK_SPEED:        80,
+  SPRINT_SPEED:      110,
   JUMP_IMPULSE:      14,    // Higher impulse + heavier gravity = fast snappy jump
   DOUBLE_JUMP_IMPULSE: 12,
   CLIMB_SPEED:       4,
