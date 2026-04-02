@@ -348,26 +348,42 @@ function hideLoading() {
   }
 }
 
-// ── Initial load: preload critical assets before showing start screen ──
-updateLoading(10, 'Initializing...');
+// ── Initial load: preload character model before showing start screen ──
+import { preloadCharacterModel } from './modelLoader.js';
 
-// Preload the world geometry (fast, code-only)
-setTimeout(() => {
-  updateLoading(40, 'Building world...');
-  setTimeout(() => {
-    updateLoading(70, 'Loading assets...');
-    setTimeout(() => {
-      updateLoading(100, 'Ready!');
-      setTimeout(() => hideLoading(), 300);
-    }, 500);
-  }, 300);
-}, 200);
+updateLoading(10, 'Initializing engine...');
+
+// Hide player until GLB character is ready
+player.group.visible = false;
+
+async function preloadGame() {
+  updateLoading(20, 'Loading character model...');
+  await preloadCharacterModel();
+  updateLoading(60, 'Preparing world...');
+
+  // Small delay for renderer to initialize
+  await new Promise(r => setTimeout(r, 300));
+  updateLoading(90, 'Almost ready...');
+
+  await new Promise(r => setTimeout(r, 200));
+  updateLoading(100, 'Ready!');
+  await new Promise(r => setTimeout(r, 300));
+  hideLoading();
+}
+
+preloadGame().catch(err => {
+  console.warn('Preload error:', err);
+  hideLoading(); // Show game anyway
+});
 
 document.getElementById('start-btn').addEventListener('click', () => {
   try {
     gameState.started = true;
     const startScreen = document.getElementById('start-screen');
     if (startScreen) startScreen.classList.add('hidden');
+
+    // Show player now
+    player.group.visible = true;
     player.reset({ x: 0, y: 1, z: 10 });
     loadWorld();
     audio.startBgMusic();
