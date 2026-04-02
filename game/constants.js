@@ -41,11 +41,11 @@ export const COLORS = {
 
 // ── Physics Constants ────────────────────────────────────────────
 export const PHYSICS = {
-  GRAVITY:          -28,    // Lighter for better jump arc
-  WALK_SPEED:        80,
-  SPRINT_SPEED:      110,
-  JUMP_IMPULSE:      13,    // Clean Roblox-style jump
-  DOUBLE_JUMP_IMPULSE: 11,
+  GRAVITY:          -35,    // Snappier fall
+  WALK_SPEED:        65,
+  SPRINT_SPEED:      90,
+  JUMP_IMPULSE:      10,    // Lower jump height
+  DOUBLE_JUMP_IMPULSE: 8,
   CLIMB_SPEED:       4,
   LINEAR_DAMPING:    0,
   ANGULAR_DAMPING:   1.0,

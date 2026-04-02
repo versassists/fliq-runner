@@ -431,12 +431,12 @@ export class Player {
         this.physicsBody.velocity.z = 0;
       }
     } else {
-      // In air: slight steering (Roblox allows ~30% air control)
+      // In air: minimal steering
       if (isMoving) {
-        this.physicsBody.velocity.x += dx * speed * 0.03;
-        this.physicsBody.velocity.z += dz * speed * 0.03;
-        // Cap air speed so you don't accelerate infinitely
-        const airMax = speed * 0.6;
+        this.physicsBody.velocity.x += dx * speed * 0.015;
+        this.physicsBody.velocity.z += dz * speed * 0.015;
+        // Cap air speed
+        const airMax = speed * 0.4;
         const vx = this.physicsBody.velocity.x;
         const vz = this.physicsBody.velocity.z;
         const airSpeed = Math.sqrt(vx * vx + vz * vz);
