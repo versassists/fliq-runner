@@ -5,7 +5,7 @@
  */
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { loadTree1Model, loadTree2Model, loadGrassModel, loadHouseModel, loadShopModel } from './modelLoader.js';
+import { loadTree1Model, loadTree2Model, loadGrassModel, loadHouseModel, loadShopModel, loadRockModel, loadFenceModel, loadCommunityHubModel, loadDistantBuildingModel } from './modelLoader.js';
 import {
   grassMat, grassOuterMat, sidewalkMat, woodMat, darkWoodMat,
   metalMat, metalLightMat, stoneMat, stoneGrayMat, trunkMat,
@@ -137,7 +137,10 @@ export class WorldBuilder {
     this._createTrampolines();
     this._createSteppingStones();
     this._createParkAreas();
-    // Spark ring trails removed
+    this._createRocks();
+    this._createFences();
+    this._createCommunityHub();
+    this._createDistantBuildings();
     this._createDecorativeSigns();
 
     if (levelData.platforms) {
@@ -1214,6 +1217,160 @@ export class WorldBuilder {
       this._meshes.push(group);
       this._signs.push({ group, baseY: 3.5, phase: Math.random() * Math.PI * 2, board });
     }
+  }
+
+  /* ═══════════════════════════════════════════════════
+     ROCKS — Scattered around landscape for natural feel
+     ═══════════════════════════════════════════════════ */
+  _createRocks() {
+    const rockSpots = [
+      { x: -18, z: -20, s: 2, ry: 0.3 },
+      { x: 22, z: -35, s: 1.5, ry: 1.2 },
+      { x: -35, z: 15, s: 2.5, ry: 2.1 },
+      { x: 30, z: 38, s: 1.8, ry: 0.8 },
+      { x: -12, z: 35, s: 1.2, ry: 3.0 },
+      { x: 40, z: -15, s: 2.0, ry: 1.5 },
+      { x: -42, z: -25, s: 1.6, ry: 0.6 },
+      { x: 15, z: -42, s: 2.2, ry: 2.4 },
+    ];
+
+    const placeRock = async () => {
+      for (const spot of rockSpots) {
+        const model = await loadRockModel();
+        if (!model) continue;
+        const box = new THREE.Box3().setFromObject(model);
+        const sz = box.getSize(new THREE.Vector3());
+        const scale = spot.s / (sz.y || 1);
+        model.scale.setScalar(scale);
+        const box2 = new THREE.Box3().setFromObject(model);
+        model.position.set(spot.x, -box2.min.y, spot.z);
+        model.rotation.y = spot.ry;
+        this.scene.add(model);
+        this._meshes.push(model);
+      }
+      console.log(`[Rocks] Placed ${rockSpots.length} rocks`);
+    };
+    placeRock();
+  }
+
+  /* ═══════════════════════════════════════════════════
+     FENCES — Around garden and house areas
+     ═══════════════════════════════════════════════════ */
+  _createFences() {
+    // Fence segments around the garden (25, -25) and house (0, -52)
+    const fenceSpots = [
+      // Garden perimeter
+      { x: 20, z: -22, ry: 0, s: 2 },
+      { x: 23, z: -22, ry: 0, s: 2 },
+      { x: 26, z: -22, ry: 0, s: 2 },
+      { x: 29, z: -22, ry: 0, s: 2 },
+      { x: 20, z: -28, ry: 0, s: 2 },
+      { x: 23, z: -28, ry: 0, s: 2 },
+      { x: 26, z: -28, ry: 0, s: 2 },
+      { x: 29, z: -28, ry: 0, s: 2 },
+      // Side fences
+      { x: 19, z: -24, ry: Math.PI / 2, s: 2 },
+      { x: 19, z: -26, ry: Math.PI / 2, s: 2 },
+      { x: 30, z: -24, ry: Math.PI / 2, s: 2 },
+      { x: 30, z: -26, ry: Math.PI / 2, s: 2 },
+      // House yard
+      { x: -3, z: -49, ry: 0, s: 1.8 },
+      { x: 0, z: -49, ry: 0, s: 1.8 },
+      { x: 3, z: -49, ry: 0, s: 1.8 },
+    ];
+
+    const placeFences = async () => {
+      for (const spot of fenceSpots) {
+        const model = await loadFenceModel();
+        if (!model) continue;
+        const box = new THREE.Box3().setFromObject(model);
+        const sz = box.getSize(new THREE.Vector3());
+        const scale = spot.s / (Math.max(sz.x, sz.z) || 1);
+        model.scale.setScalar(scale);
+        const box2 = new THREE.Box3().setFromObject(model);
+        model.position.set(spot.x, -box2.min.y, spot.z);
+        model.rotation.y = spot.ry;
+        this.scene.add(model);
+        this._meshes.push(model);
+      }
+      console.log(`[Fences] Placed ${fenceSpots.length} fence segments`);
+    };
+    placeFences();
+  }
+
+  /* ═══════════════════════════════════════════════════
+     COMMUNITY HUB — Central meeting building near plaza
+     ═══════════════════════════════════════════════════ */
+  _createCommunityHub() {
+    loadCommunityHubModel().then((model) => {
+      if (!model) return;
+      const targetHeight = 10;
+      const box = new THREE.Box3().setFromObject(model);
+      const sz = box.getSize(new THREE.Vector3());
+      const scale = targetHeight / (sz.y || 1);
+      model.scale.setScalar(scale);
+      const box2 = new THREE.Box3().setFromObject(model);
+      const center = box2.getCenter(new THREE.Vector3());
+      model.position.set(12, -box2.min.y, -12);
+      model.position.x -= center.x - 12;
+      model.position.z -= center.z + 12;
+      model.rotation.y = 0.3;
+      model.traverse((child) => {
+        if (child.isMesh) {
+          child.castShadow = !isMobile;
+          child.receiveShadow = true;
+        }
+      });
+      this.scene.add(model);
+      this._meshes.push(model);
+      console.log('[CommunityHub] Placed at (12, -12)');
+    });
+  }
+
+  /* ═══════════════════════════════════════════════════
+     DISTANT BUILDINGS — Background silhouettes for depth
+     ═══════════════════════════════════════════════════ */
+  _createDistantBuildings() {
+    const spots = [
+      { x: -75, z: -55, s: 12, ry: 0.4 },
+      { x: -70, z: -48, s: 9, ry: -0.3 },
+      { x: 75, z: -50, s: 14, ry: 0.7 },
+      { x: 80, z: -42, s: 10, ry: -0.5 },
+      { x: -72, z: 50, s: 11, ry: 0.2 },
+      { x: -68, z: 58, s: 8, ry: 1.1 },
+      { x: 70, z: 55, s: 13, ry: -0.4 },
+      { x: 78, z: 48, s: 9, ry: 0.8 },
+      { x: -55, z: -72, s: 10, ry: 0.6 },
+      { x: 55, z: -75, s: 12, ry: -0.2 },
+      { x: -60, z: 70, s: 11, ry: 0.9 },
+      { x: 60, z: 72, s: 10, ry: -0.7 },
+    ];
+
+    const placeDistant = async () => {
+      for (const spot of spots) {
+        const model = await loadDistantBuildingModel();
+        if (!model) continue;
+        const box = new THREE.Box3().setFromObject(model);
+        const sz = box.getSize(new THREE.Vector3());
+        const scale = spot.s / (sz.y || 1);
+        model.scale.setScalar(scale);
+        const box2 = new THREE.Box3().setFromObject(model);
+        model.position.set(spot.x, -box2.min.y, spot.z);
+        model.rotation.y = spot.ry;
+        // Make distant buildings slightly transparent for depth
+        model.traverse((child) => {
+          if (child.isMesh && child.material) {
+            child.material = child.material.clone();
+            child.material.transparent = true;
+            child.material.opacity = 0.7;
+          }
+        });
+        this.scene.add(model);
+        this._meshes.push(model);
+      }
+      console.log(`[DistantBuildings] Placed ${spots.length} background buildings`);
+    };
+    placeDistant();
   }
 
   /* ═══════════════════════════════════════════════════

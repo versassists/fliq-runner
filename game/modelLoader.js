@@ -23,6 +23,10 @@ const FOUNTAIN_GLB  = '3d asset/Meshy_AI_fountain_0323123957_texture_opt.glb';
 const ARCADE_GLB    = '3d asset/arcade.glb';
 const HOUSE_GLB     = '3d asset/Meshy_AI_house1_0323123910_texture_opt.glb';
 const SHOP_GLB      = '3d asset/Meshy_AI_shop_0323123928_texture_opt.glb';
+const ROCK_GLB      = '3d asset/meshy_rock1_opt.glb';
+const FENCE_GLB     = '3d asset/meshy_fence_opt.glb';
+const COMMUNITY_HUB_GLB = '3d asset/meshy_community_hub_opt.glb';
+const DISTANT_BLDG_GLB  = '3d asset/meshy_distant_building_opt.glb';
 
 // ── Module-level cache ─────────────────────────────────────────────
 let _loadPromise = null;
@@ -366,3 +370,7 @@ export function loadFountainModel() { return _loadAsset(FOUNTAIN_GLB, 'Fountain'
 export function loadArcadeModel()   { return _loadAsset(ARCADE_GLB, 'Arcade'); }
 export function loadHouseModel()    { return _loadAsset(HOUSE_GLB, 'House'); }
 export function loadShopModel()     { return _loadAsset(SHOP_GLB, 'Shop'); }
+export function loadRockModel()     { return _loadAsset(ROCK_GLB, 'Rock'); }
+export function loadFenceModel()    { return _loadAsset(FENCE_GLB, 'Fence'); }
+export function loadCommunityHubModel() { return _loadAsset(COMMUNITY_HUB_GLB, 'CommunityHub'); }
+export function loadDistantBuildingModel() { return _loadAsset(DISTANT_BLDG_GLB, 'DistantBuilding'); }
