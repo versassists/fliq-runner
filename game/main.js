@@ -390,6 +390,8 @@ document.getElementById('start-btn').addEventListener('click', () => {
     player.reset({ x: 0, y: 1, z: 10 });
     loadWorld();
     audio.startBgMusic();
+    // Activate free camera immediately
+    camRig._mouseActive = true;
   } catch (err) {
     console.error('LOAD ERROR:', err);
     alert('Error starting game: ' + err.message);
