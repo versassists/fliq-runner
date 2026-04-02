@@ -7,18 +7,17 @@ export class ThirdPersonCamera {
     this.pitch    = 0.35;
     this.distance = 14;
 
-    // Zoom
     this.zoomLevel = 1;
     this.minZoom   = 0.5;
     this.maxZoom   = 2.5;
+    this.minPitch  = 0.05;
+    this.maxPitch  = Math.PI / 2 - 0.05;
 
-    // Vertical limits
-    this.minPitch = 0.05;
-    this.maxPitch = Math.PI / 2 - 0.05;
-
-    // State
-    this._isLocked   = false;
     this._currentPos = new THREE.Vector3();
+    this._isDragging = false;
+    this._lastX = 0;
+    this._lastY = 0;
+    this._cameraTouchId = null;
 
     this._setupControls();
   }
@@ -28,98 +27,104 @@ export class ThirdPersonCamera {
   }
 
   _setupControls() {
-    // ── Pointer Lock (click canvas → lock cursor → mouse = camera) ──
-    document.addEventListener('pointerlockchange', () => {
-      this._isLocked = document.pointerLockElement !== null;
+    // ═══ DESKTOP: Right-click hold + drag = rotate camera ═══
+    document.addEventListener('mousedown', (e) => {
+      if (e.button === 2) {
+        this._isDragging = true;
+        this._lastX = e.clientX;
+        this._lastY = e.clientY;
+        e.preventDefault();
+      }
     });
 
     document.addEventListener('mousemove', (e) => {
-      if (!this._isLocked) return;
-      this.yaw   -= e.movementX * 0.002;
-      this.pitch -= e.movementY * 0.002;
+      if (!this._isDragging) return;
+      this.yaw   -= (e.clientX - this._lastX) * 0.004;
+      this.pitch -= (e.clientY - this._lastY) * 0.004;
       this.pitch  = Math.max(this.minPitch, Math.min(this.maxPitch, this.pitch));
+      this._lastX = e.clientX;
+      this._lastY = e.clientY;
     });
 
-    // ── Mouse-wheel zoom ──
+    document.addEventListener('mouseup', (e) => {
+      if (e.button === 2) this._isDragging = false;
+    });
+
+    document.addEventListener('contextmenu', (e) => e.preventDefault());
+
+    // Scroll zoom
     window.addEventListener('wheel', (e) => {
       e.preventDefault();
       this.zoom(Math.sign(e.deltaY) * 0.15);
     }, { passive: false });
 
-    // ── Touch: pinch-zoom + right-side camera drag ──
-    let touchStartDist = 0;
-    let isPinching = false;
-    let cameraTouchId = null;
-    let lastTouchX = 0;
-    let lastTouchY = 0;
-
+    // ═══ MOBILE: Right side touch drag = rotate camera ═══
     document.addEventListener('touchstart', (e) => {
+      // Pinch zoom
       if (e.touches.length === 2) {
-        isPinching = true;
         const dx = e.touches[0].clientX - e.touches[1].clientX;
         const dy = e.touches[0].clientY - e.touches[1].clientY;
-        touchStartDist = Math.sqrt(dx * dx + dy * dy);
-      } else if (e.touches.length === 1 && cameraTouchId === null) {
-        // Right 55% of screen = camera drag
-        if (e.touches[0].clientX > window.innerWidth * 0.45) {
-          cameraTouchId = e.touches[0].identifier;
-          lastTouchX = e.touches[0].clientX;
-          lastTouchY = e.touches[0].clientY;
+        this._pinchDist = Math.sqrt(dx * dx + dy * dy);
+        return;
+      }
+
+      // Single touch on right side (above buttons area) = camera
+      if (e.touches.length === 1 && this._cameraTouchId === null) {
+        const t = e.touches[0];
+        const rightSide = t.clientX > window.innerWidth * 0.45;
+        const aboveButtons = t.clientY < window.innerHeight * 0.55;
+        if (rightSide && aboveButtons) {
+          this._cameraTouchId = t.identifier;
+          this._lastX = t.clientX;
+          this._lastY = t.clientY;
         }
       }
-    });
+    }, { passive: true });
 
     document.addEventListener('touchmove', (e) => {
-      if (e.touches.length === 2 && isPinching) {
-        e.preventDefault();
+      // Pinch
+      if (e.touches.length === 2 && this._pinchDist) {
         const dx = e.touches[0].clientX - e.touches[1].clientX;
         const dy = e.touches[0].clientY - e.touches[1].clientY;
         const cur = Math.sqrt(dx * dx + dy * dy);
-        this.zoom((touchStartDist - cur) * 0.002);
-        touchStartDist = cur;
-      } else if (cameraTouchId !== null) {
-        for (const touch of e.changedTouches) {
-          if (touch.identifier === cameraTouchId) {
-            const dx = touch.clientX - lastTouchX;
-            const dy = touch.clientY - lastTouchY;
-            this.yaw   -= dx * 0.004;
-            this.pitch  = Math.max(this.minPitch, Math.min(this.maxPitch, this.pitch - dy * 0.004));
-            lastTouchX = touch.clientX;
-            lastTouchY = touch.clientY;
-            e.preventDefault();
+        this.zoom((this._pinchDist - cur) * 0.002);
+        this._pinchDist = cur;
+        e.preventDefault();
+        return;
+      }
+
+      // Camera drag
+      if (this._cameraTouchId !== null) {
+        for (const t of e.changedTouches) {
+          if (t.identifier === this._cameraTouchId) {
+            this.yaw   -= (t.clientX - this._lastX) * 0.004;
+            this.pitch -= (t.clientY - this._lastY) * 0.004;
+            this.pitch  = Math.max(this.minPitch, Math.min(this.maxPitch, this.pitch));
+            this._lastX = t.clientX;
+            this._lastY = t.clientY;
           }
         }
       }
     }, { passive: false });
 
     document.addEventListener('touchend', (e) => {
-      if (e.touches.length < 2) isPinching = false;
-      for (const touch of e.changedTouches) {
-        if (touch.identifier === cameraTouchId) {
-          cameraTouchId = null;
+      this._pinchDist = null;
+      for (const t of e.changedTouches) {
+        if (t.identifier === this._cameraTouchId) {
+          this._cameraTouchId = null;
         }
       }
     });
   }
 
-  requestPointerLock(canvas) {
-    canvas.requestPointerLock();
-  }
-
   update(targetPos) {
     const dist = this.distance * this.zoomLevel;
-
-    const offsetX = dist * Math.sin(this.yaw) * Math.cos(this.pitch);
-    const offsetY = dist * Math.sin(this.pitch);
-    const offsetZ = dist * Math.cos(this.yaw) * Math.cos(this.pitch);
-
     const desiredPos = new THREE.Vector3(
-      targetPos.x + offsetX,
-      targetPos.y + offsetY + 2,
-      targetPos.z + offsetZ
+      targetPos.x + dist * Math.sin(this.yaw) * Math.cos(this.pitch),
+      targetPos.y + dist * Math.sin(this.pitch) + 2,
+      targetPos.z + dist * Math.cos(this.yaw) * Math.cos(this.pitch)
     );
 
-    // Smooth follow
     this._currentPos.lerp(desiredPos, 0.12);
     this.camera.position.copy(this._currentPos);
     this.camera.lookAt(targetPos.x, targetPos.y + 1.5, targetPos.z);

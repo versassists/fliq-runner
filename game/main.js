@@ -391,14 +391,7 @@ document.getElementById('start-btn').addEventListener('click', () => {
     loadWorld();
     audio.startBgMusic();
 
-    // Desktop: click canvas → pointer lock (cursor hidden, mouse = camera)
-    if (!isMobile) {
-      canvas.addEventListener('click', () => {
-        if (!document.pointerLockElement) {
-          canvas.requestPointerLock();
-        }
-      });
-    }
+    // Camera controlled by right-click drag (desktop) or touch drag (mobile)
   } catch (err) {
     console.error('LOAD ERROR:', err);
     alert('Error starting game: ' + err.message);
