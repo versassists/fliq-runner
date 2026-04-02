@@ -889,8 +889,8 @@ export class WorldBuilder {
      CLOUDS — InstancedMesh (all cloud parts)
      ═══════════════════════════════════════════════════ */
   _createClouds() {
-    const cloudCount = isMobile ? 8 : 14;
-    const partsPerCloud = isMobile ? 3 : 5;
+    const cloudCount = isMobile ? 4 : 14;
+    const partsPerCloud = isMobile ? 2 : 5;
     const totalParts = cloudCount * partsPerCloud;
 
     const sphereGeo = new THREE.SphereGeometry(1, isMobile ? 8 : 12, isMobile ? 8 : 12);
@@ -934,7 +934,7 @@ export class WorldBuilder {
      GRASS — GLB models (grass1.glb) scattered around
      ═══════════════════════════════════════════════════ */
   _createBushes() {
-    const grassTarget = isMobile ? 4 : 16; // Minimal on mobile
+    const grassTarget = isMobile ? 4 : 10; // Reduced for performance
     const grassPositions = [];
     // Keep generating until we have enough that avoid roads
     let attempts = 0;
@@ -1006,7 +1006,7 @@ export class WorldBuilder {
       { x: -28, z: 10 }, { x: 28, z: 10 }, { x: 10, z: -28 }, { x: 10, z: 28 },
       { x: -25, z: -25 }, { x: 32, z: -20 }, { x: -25, z: 25 }, { x: 25, z: 25 },
     ].filter(p => !(Math.abs(p.x) < 8 && Math.abs(p.z) < 8));
-    const treePositions = isMobile ? allTreePos.slice(0, 4) : allTreePos;
+    const treePositions = isMobile ? allTreePos.slice(0, 4) : allTreePos.slice(0, 8);
 
     const targetHeight = 5;
 
@@ -1074,6 +1074,7 @@ export class WorldBuilder {
      FLOWER BEDS — Small groups near center
      ═══════════════════════════════════════════════════ */
   _createFlowerBeds() {
+    if (isMobile) return; // 56 meshes — skip on mobile
     const bedPositions = [
       { x: -15, z: -15 }, { x: 15, z: -15 }, { x: -15, z: 15 }, { x: 15, z: 15 },
     ];
@@ -1303,7 +1304,7 @@ export class WorldBuilder {
       { x: -42, z: -25, s: 1.6, ry: 0.6 },
       { x: 15, z: -42, s: 2.2, ry: 2.4 },
     ];
-    const rockSpots = isMobile ? allSpots.slice(0, 3) : allSpots;
+    const rockSpots = isMobile ? allSpots.slice(0, 3) : allSpots.slice(0, 5);
 
     const placeRock = async () => {
       for (const spot of rockSpots) {
@@ -1330,24 +1331,16 @@ export class WorldBuilder {
   _createFences() {
     if (isMobile) return; // Skip fences on mobile to save GPU
     const fenceSpots = [
-      // Garden perimeter
-      { x: 20, z: -22, ry: 0, s: 2 },
-      { x: 23, z: -22, ry: 0, s: 2 },
-      { x: 26, z: -22, ry: 0, s: 2 },
-      { x: 29, z: -22, ry: 0, s: 2 },
-      { x: 20, z: -28, ry: 0, s: 2 },
-      { x: 23, z: -28, ry: 0, s: 2 },
-      { x: 26, z: -28, ry: 0, s: 2 },
-      { x: 29, z: -28, ry: 0, s: 2 },
-      // Side fences
-      { x: 19, z: -24, ry: Math.PI / 2, s: 2 },
-      { x: 19, z: -26, ry: Math.PI / 2, s: 2 },
-      { x: 30, z: -24, ry: Math.PI / 2, s: 2 },
-      { x: 30, z: -26, ry: Math.PI / 2, s: 2 },
-      // House yard
-      { x: -3, z: -49, ry: 0, s: 1.8 },
-      { x: 0, z: -49, ry: 0, s: 1.8 },
-      { x: 3, z: -49, ry: 0, s: 1.8 },
+      // Garden front + back only (reduced from 15 to 8 for performance)
+      { x: 18, z: -19, ry: 0, s: 2.5 },
+      { x: 25, z: -19, ry: 0, s: 2.5 },
+      { x: 32, z: -19, ry: 0, s: 2.5 },
+      { x: 18, z: -31, ry: 0, s: 2.5 },
+      { x: 25, z: -31, ry: 0, s: 2.5 },
+      { x: 32, z: -31, ry: 0, s: 2.5 },
+      // House yard (reduced to 2)
+      { x: -2, z: -49, ry: 0, s: 2.0 },
+      { x: 2, z: -49, ry: 0, s: 2.0 },
     ];
 
     const placeFences = async () => {
@@ -1403,20 +1396,13 @@ export class WorldBuilder {
      DISTANT BUILDINGS — Background silhouettes for depth
      ═══════════════════════════════════════════════════ */
   _createDistantBuildings() {
-    if (isMobile) return; // Skip distant buildings on mobile — too many GLB loads
+    if (isMobile) return; // Skip distant buildings on mobile
+    // Reduced from 12 to 4 for performance (each is a GLB clone)
     const spots = [
       { x: -75, z: -55, s: 12, ry: 0.4 },
-      { x: -70, z: -48, s: 9, ry: -0.3 },
       { x: 75, z: -50, s: 14, ry: 0.7 },
-      { x: 80, z: -42, s: 10, ry: -0.5 },
       { x: -72, z: 50, s: 11, ry: 0.2 },
-      { x: -68, z: 58, s: 8, ry: 1.1 },
       { x: 70, z: 55, s: 13, ry: -0.4 },
-      { x: 78, z: 48, s: 9, ry: 0.8 },
-      { x: -55, z: -72, s: 10, ry: 0.6 },
-      { x: 55, z: -75, s: 12, ry: -0.2 },
-      { x: -60, z: 70, s: 11, ry: 0.9 },
-      { x: 60, z: 72, s: 10, ry: -0.7 },
     ];
 
     const placeDistant = async () => {
