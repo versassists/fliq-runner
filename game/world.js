@@ -107,9 +107,7 @@ export class WorldBuilder {
     this.clear();
 
     this.scene.background = new THREE.Color(0x87CEEB);
-    this.scene.fog = new THREE.Fog(0x99ddff, 120, 280);
-
-    // No dark road base needed — full grass ground covers everything
+    this.scene.fog = new THREE.Fog(0x99ddff, isMobile ? 60 : 120, isMobile ? 140 : 280);
 
     // ── Ground physics ──
     const groundBody = new CANNON.Body({ mass: 0 });
@@ -119,36 +117,57 @@ export class WorldBuilder {
     this.physicsWorld.addBody(groundBody);
     this._bodies.push(groundBody);
 
-    // ── Ground & landscape ──
+    // ═══ PHASE 1: Instant (code-only, no GLB) — renders immediately ═══
     this._createGroundAreas();
     this._createHills();
-
-    // ── Organic flowing paths (replaces T-roads) ──
     this._createFlowingPaths();
     this._createCentralPlaza();
-
-    // ── Terrain depth (gentle elevation changes) ──
     this._createTerrainDepth();
-
-    // ── World elements ──
-    this._createNeighborhoodBuildings();
     this._createStreetLamps();
     this._createClouds();
-    this._createBushes();
-    this._createTrees();
-    this._createFlowerBeds();
     this._createTrampolines();
     this._createSteppingStones();
     this._createParkAreas();
-    this._createRocks();
-    this._createFences();
-    this._createCommunityHub();
-    this._createDistantBuildings();
-    this._createDecorativeSigns();
+    if (!isMobile) this._createFlowerBeds();
+    if (!isMobile) this._createDecorativeSigns();
 
     if (levelData.platforms) {
       for (const p of levelData.platforms) this._addPlatform(...p);
     }
+
+    // ═══ PHASE 2: Staggered GLB loading (one at a time, prevents choking) ═══
+    this._loadAssetsStaggered();
+  }
+
+  async _loadAssetsStaggered() {
+    // Queue of asset loaders — each runs after the previous finishes
+    // This prevents 30+ simultaneous GLB fetches that choke the browser
+    const queue = [];
+
+    // Priority 1: Main buildings (player sees these first)
+    queue.push(() => this._createNeighborhoodBuildings());
+
+    // Priority 2: Trees (most visible vegetation)
+    queue.push(() => this._createTrees());
+
+    // Priority 3: Bushes
+    queue.push(() => this._createBushes());
+
+    // Desktop only — lower priority assets
+    if (!isMobile) {
+      queue.push(() => this._createRocks());
+      queue.push(() => this._createFences());
+      queue.push(() => this._createCommunityHub());
+      queue.push(() => this._createDistantBuildings());
+    }
+
+    // Run sequentially with small delays to let renderer breathe
+    for (const loader of queue) {
+      loader();
+      // Give browser 100ms to render/GC between batches
+      await new Promise(r => setTimeout(r, 100));
+    }
+    console.log('[World] All assets loaded (staggered)');
   }
 
   /* ═══════════════════════════════════════════════════
@@ -166,8 +185,8 @@ export class WorldBuilder {
       { x: 0, z: -52, r: 6, h: 1.2 },
       // Slight rise near garden (25, -25)
       { x: 25, z: -25, r: 5, h: 0.8 },
-      // Rise near community hub (12, -12)
-      { x: 12, z: -12, r: 7, h: 1.0 },
+      // Rise near community hub (-15, -15)
+      { x: -15, z: -15, r: 5, h: 0.8 },
       // Gentle bump near toy store (30, 30)
       { x: 30, z: 30, r: 5, h: 0.6 },
       // Rise near recipe workshop (-38, 32)
@@ -1369,16 +1388,17 @@ export class WorldBuilder {
     if (isMobile) return; // Skip on mobile — too heavy
     loadCommunityHubModel().then((model) => {
       if (!model) return;
-      const targetHeight = 10;
+      const targetHeight = 6; // Reduced from 10 — was too large
       const box = new THREE.Box3().setFromObject(model);
       const sz = box.getSize(new THREE.Vector3());
       const scale = targetHeight / (sz.y || 1);
       model.scale.setScalar(scale);
       const box2 = new THREE.Box3().setFromObject(model);
       const center = box2.getCenter(new THREE.Vector3());
-      model.position.set(12, -box2.min.y, -12);
-      model.position.x -= center.x - 12;
-      model.position.z -= center.z + 12;
+      // Moved to (-15, -15) — away from garden at (25, -25)
+      model.position.set(-15, -box2.min.y, -15);
+      model.position.x -= center.x + 15;
+      model.position.z -= center.z + 15;
       model.rotation.y = 0.3;
       model.traverse((child) => {
         if (child.isMesh) {

@@ -34,10 +34,13 @@ const renderer = new THREE.WebGLRenderer({
   failIfMajorPerformanceCaveat: false,
 });
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(isMobile ? 1 : Math.min(window.devicePixelRatio, 2));
-renderer.shadowMap.enabled = !isMobile; // Disable shadows on mobile (biggest GPU saver)
-renderer.shadowMap.type    = THREE.PCFSoftShadowMap;
-renderer.toneMapping       = THREE.LinearToneMapping;
+// Cap pixel ratio: 1 on mobile, 1.5 on desktop (not 2 — biggest single FPS boost)
+renderer.setPixelRatio(isMobile ? 1 : Math.min(window.devicePixelRatio, 1.5));
+renderer.shadowMap.enabled = !isMobile;
+if (!isMobile) {
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+}
+renderer.toneMapping = THREE.LinearToneMapping;
 renderer.toneMappingExposure = 1.1;
 
 // ── WebGL context loss recovery (prevents mobile "disappearing" bug) ──
