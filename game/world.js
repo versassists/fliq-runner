@@ -174,8 +174,7 @@ export class WorldBuilder {
     const mounds = [
       // Raised area under house (0, -52) — sits on small hill
       { x: 0, z: -52, r: 6, h: 1.2 },
-      // Slight rise near garden (25, -25)
-      { x: 25, z: -25, r: 5, h: 0.8 },
+      // Garden mound removed — was overlapping garden GLB
       // Rise near community hub (-15, -15)
       { x: -15, z: -15, r: 5, h: 0.8 },
       // Gentle bump near toy store (30, 30)
