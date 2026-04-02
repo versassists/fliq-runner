@@ -169,9 +169,32 @@
       .screen-card { padding: 28px 24px; }
       .screen-card h1 { font-size: 1.8rem; }
     }
+
+    /* ── Force landscape on mobile (rotate message for portrait) ── */
+    #rotate-msg {
+      display: none;
+      position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+      background: linear-gradient(145deg, #1a0e35, #0d0620);
+      z-index: 99999;
+      flex-direction: column; align-items: center; justify-content: center;
+      color: #88ddff; font-family: 'Segoe UI', Arial, sans-serif; text-align: center;
+    }
+    #rotate-msg span { font-size: 3rem; margin-bottom: 16px; }
+    #rotate-msg p { font-size: 1.1rem; color: #aa88ff; }
+
+    @media (max-width: 900px) and (orientation: portrait) {
+      #rotate-msg { display: flex !important; }
+      #game-canvas, #hud, #start-screen { display: none !important; }
+    }
   </style>
 </head>
 <body>
+
+  <!-- Rotate device message (portrait mode on mobile) -->
+  <div id="rotate-msg">
+    <span>📱</span>
+    <p>Please rotate your device to landscape mode</p>
+  </div>
 
   <!-- Loading Screen (shown while assets load) -->
   <div id="loading-screen" style="
@@ -235,6 +258,8 @@
         if ('ontouchstart' in window) {
           document.getElementById('controls-desktop').style.display = 'none';
           document.getElementById('controls-mobile').style.display = '';
+          // Try to lock orientation to landscape on mobile
+          try { screen.orientation.lock('landscape').catch(() => {}); } catch(e) {}
         }
       </script>
       <button id="start-btn" class="btn-primary">▶ BEGIN EXPLORATION</button>
