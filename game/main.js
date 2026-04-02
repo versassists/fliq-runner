@@ -404,7 +404,7 @@ function animate(now) {
   if (!gameState.started) return;
 
   if (!gameState.paused) {
-    physicsWorld.step(1 / 60, dt, 3);
+    physicsWorld.step(1 / 60, dt, isMobile ? 2 : 3);
 
     // Player
     player.update(camRig.yaw, false, dt);
@@ -472,8 +472,10 @@ function animate(now) {
       }
     }
 
-    // Visual effects (particles, pulses, energy trails)
-    effects.update(dt, player.group.position);
+    // Visual effects — throttle to every other frame on mobile
+    if (!isMobile || (now % 2 < 1)) {
+      effects.update(dt, player.group.position);
+    }
 
     // Passive behavioral tracking
     behavior.update(dt);

@@ -1373,6 +1373,7 @@ export class WorldBuilder {
      COMMUNITY HUB — Central meeting building near plaza
      ═══════════════════════════════════════════════════ */
   _createCommunityHub() {
+    if (isMobile) return; // Skip on mobile — too heavy
     loadCommunityHubModel().then((model) => {
       if (!model) return;
       const targetHeight = 10;
