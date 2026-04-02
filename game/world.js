@@ -149,16 +149,51 @@ export class WorldBuilder {
       this._createDistantBuildings(); // InstancedMesh — 1 draw call
     }
 
-    // GLB assets (only 2-3 models — staggered)
-    await new Promise(r => setTimeout(r, 50));
-    this._createNeighborhoodBuildings(); // 2 GLBs: house + shop
-
+    // GLB assets — desktop only (mobile uses procedural fallbacks)
     if (!isMobile) {
+      await new Promise(r => setTimeout(r, 50));
+      this._createNeighborhoodBuildings(); // 2 GLBs: house + shop
       await new Promise(r => setTimeout(r, 100));
       this._createCommunityHub(); // 1 GLB
+      console.log('[World] Desktop: 3 GLB assets loaded');
+    } else {
+      // Mobile: procedural buildings (zero GLB loads = zero crash risk)
+      this._createMobileBuildings();
+      console.log('[World] Mobile: procedural only (0 GLBs)');
     }
+  }
 
-    console.log('[World] All assets loaded — GLBs: ' + (isMobile ? '2' : '3'));
+  /* ═══════════════════════════════════════════════════
+     MOBILE BUILDINGS — Simple procedural boxes (zero GLB loads)
+     ═══════════════════════════════════════════════════ */
+  _createMobileBuildings() {
+    const buildings = [
+      { x: 0, z: -52, w: 5, h: 6, d: 5, color: 0xFFEEAA, rot: 0 },      // House
+      { x: -38, z: 32, w: 5, h: 5, d: 5, color: 0xFFBBCC, rot: -0.4 },   // Shop
+    ];
+
+    for (const b of buildings) {
+      const group = new THREE.Group();
+      // Body
+      const bodyGeo = new THREE.BoxGeometry(b.w, b.h, b.d);
+      const bodyMat = new THREE.MeshStandardMaterial({ color: b.color, roughness: 0.6 });
+      const body = new THREE.Mesh(bodyGeo, bodyMat);
+      body.position.y = b.h / 2;
+      body.castShadow = false;
+      group.add(body);
+      // Roof
+      const roofGeo = new THREE.ConeGeometry(b.w * 0.75, 2, 4);
+      const roofMat = new THREE.MeshStandardMaterial({ color: 0xCC6644, roughness: 0.7 });
+      const roof = new THREE.Mesh(roofGeo, roofMat);
+      roof.position.y = b.h + 1;
+      roof.rotation.y = Math.PI / 4;
+      group.add(roof);
+
+      group.position.set(b.x, 0, b.z);
+      group.rotation.y = b.rot;
+      this.scene.add(group);
+      this._meshes.push(group);
+    }
   }
 
   /* ═══════════════════════════════════════════════════
@@ -166,6 +201,7 @@ export class WorldBuilder {
      95% flat, small raised areas near buildings and along edges
      ═══════════════════════════════════════════════════ */
   _createTerrainDepth() {
+    if (isMobile) return; // Skip on mobile
     const bumpMat = new THREE.MeshStandardMaterial({
       color: 0x6AAF5C, roughness: 0.9,
     });
