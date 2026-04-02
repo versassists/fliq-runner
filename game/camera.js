@@ -4,8 +4,8 @@ export class ThirdPersonCamera {
   constructor(camera) {
     this.camera   = camera;
     this.yaw      = 0;     // horizontal rotation (radians)
-    this.pitch    = 0.6;   // vertical angle (radians)  — raised for arena overview
-    this.distance = 20;    // base distance from player
+    this.pitch    = 0.35;  // vertical angle — Roblox-like (slightly above shoulder)
+    this.distance = 14;    // Roblox-like camera distance
 
     // ── Zoom ──
     this.zoomLevel    = 1;

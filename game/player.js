@@ -391,7 +391,7 @@ export class Player {
     if (this.keys.d) dx += 1;
 
     const isMoving = dx !== 0 || dz !== 0;
-    const isSprinting = isMoving && (this.keys.shift || this.keys.space) && grounded;
+    const isSprinting = isMoving && this.keys.shift && grounded;
 
     if (isMoving) {
       const len = Math.sqrt(dx * dx + dz * dz);
@@ -431,12 +431,37 @@ export class Player {
         this.physicsBody.velocity.z = 0;
       }
     } else {
-      // In air: zero out horizontal — no forward movement while jumping
-      this.physicsBody.velocity.x = 0;
-      this.physicsBody.velocity.z = 0;
+      // In air: slight steering (Roblox allows ~30% air control)
+      if (isMoving) {
+        this.physicsBody.velocity.x += dx * speed * 0.03;
+        this.physicsBody.velocity.z += dz * speed * 0.03;
+        // Cap air speed so you don't accelerate infinitely
+        const airMax = speed * 0.6;
+        const vx = this.physicsBody.velocity.x;
+        const vz = this.physicsBody.velocity.z;
+        const airSpeed = Math.sqrt(vx * vx + vz * vz);
+        if (airSpeed > airMax) {
+          this.physicsBody.velocity.x *= airMax / airSpeed;
+          this.physicsBody.velocity.z *= airMax / airSpeed;
+        }
+      }
     }
 
-    // Jump removed — space is now sprint
+    // ── Jump (Space) — Roblox style ──
+    const spaceJustPressed = this.keys.space && !this._spaceWasDown;
+    this._spaceWasDown = this.keys.space;
+
+    if (spaceJustPressed) {
+      if (grounded) {
+        this.physicsBody.velocity.y = PHYSICS.JUMP_IMPULSE;
+        this.state = PlayerState.JUMPING;
+      } else if (this.canDoubleJump && !this.hasDoubleJumped) {
+        this.physicsBody.velocity.y = PHYSICS.DOUBLE_JUMP_IMPULSE;
+        this.hasDoubleJumped = true;
+        this.canDoubleJump = false;
+        this.state = PlayerState.JUMPING;
+      }
+    }
 
     // ── Aerial state ──
     if (!grounded) {

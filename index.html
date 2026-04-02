@@ -252,10 +252,11 @@
          complete missions, discover hidden paths, and help your neighbors.
          Collect Spark energy as you run, jump, and explore!</p>
       <div class="controls-hint" id="controls-desktop">
-        <span>WASD / Arrows — Move</span>
-        <span>SHIFT — Sprint</span>
+        <span>WASD — Move</span>
         <span>SPACE — Jump</span>
+        <span>SHIFT — Sprint</span>
         <span>E — Interact</span>
+        <span>Right-Click Drag — Camera</span>
         <span>Scroll — Zoom</span>
         <span>C — Chronicle</span>
       </div>
@@ -274,7 +275,12 @@
           try { screen.orientation.lock('landscape').catch(() => {}); } catch(e) {}
         }
       </script>
-      <button id="start-btn" class="btn-primary">▶ BEGIN EXPLORATION</button>
+      <button id="start-btn" class="btn-primary" onclick="
+        if ('ontouchstart' in window) {
+          try { document.documentElement.requestFullscreen().catch(()=>{}); } catch(e) {}
+          try { screen.orientation.lock('landscape').catch(()=>{}); } catch(e) {}
+        }
+      ">▶ BEGIN EXPLORATION</button>
     </div>
   </div>
 
