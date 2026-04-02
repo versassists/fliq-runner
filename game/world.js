@@ -170,8 +170,8 @@ export class WorldBuilder {
       { x: 12, z: -12, r: 7, h: 1.0 },
       // Gentle bump near toy store (30, 30)
       { x: 30, z: 30, r: 5, h: 0.6 },
-      // Rise near recipe workshop (-30, 30)
-      { x: -30, z: 28, r: 5, h: 0.7 },
+      // Rise near recipe workshop (-38, 32)
+      { x: -38, z: 32, r: 5, h: 0.7 },
       // Rolling terrain at edges
       { x: -45, z: 0, r: 8, h: 1.5 },
       { x: 45, z: 0, r: 7, h: 1.0 },
@@ -225,8 +225,8 @@ export class WorldBuilder {
     const buildingSpots = [
       // 1 house — behind the arcade (0, -38)
       { x: 0, z: -52, rot: 0, type: 'house' },
-      // 1 shop (Recipe Workshop)
-      { x: -30, z: 28, rot: -0.4, type: 'shop' },
+      // 1 shop (Recipe Workshop) — offset from Lemonade Stand at (-30, 30)
+      { x: -38, z: 32, rot: -0.4, type: 'shop' },
     ];
 
     const targetHeight = 8; // Consistent building height
@@ -845,20 +845,20 @@ export class WorldBuilder {
      STREET LAMPS — InstancedMesh (poles + globes)
      ═══════════════════════════════════════════════════ */
   _createStreetLamps() {
-    // Lamp positions along flowing paths (organic placement)
+    // Lamp positions along flowing paths (offset from benches/objects)
     const positions = [
-      // Along NE path
-      { x: 10, z: -10 }, { x: 22, z: -18 }, { x: 36, z: -28 },
+      // Along NE path (shifted to avoid bench at 10,-10)
+      { x: 14, z: -10 }, { x: 22, z: -18 }, { x: 36, z: -28 },
       // Along NW path
       { x: -12, z: -8 }, { x: -26, z: -20 }, { x: -34, z: -30 },
       // Along SE path
       { x: 8, z: 12 }, { x: 16, z: 22 }, { x: 22, z: 35 },
-      // Along SW path
-      { x: -10, z: 10 }, { x: -22, z: 22 }, { x: -32, z: 30 },
+      // Along SW path (shifted to avoid bench at -10,10)
+      { x: -14, z: 10 }, { x: -22, z: 22 }, { x: -32, z: 30 },
       // Along N connector
       { x: -2, z: -18 }, { x: 0, z: -38 },
       // Around plaza
-      { x: 10, z: 4 }, { x: -10, z: -4 },
+      { x: 12, z: 6 }, { x: -12, z: -6 },
     ];
 
     const poleGeo = new THREE.CylinderGeometry(0.08, 0.1, 4, 6);
@@ -1004,7 +1004,7 @@ export class WorldBuilder {
     const allTreePos = [
       { x: -12, z: -12 }, { x: 12, z: -12 }, { x: -12, z: 12 }, { x: 12, z: 12 },
       { x: -28, z: 10 }, { x: 28, z: 10 }, { x: 10, z: -28 }, { x: 10, z: 28 },
-      { x: -25, z: -25 }, { x: 25, z: -25 }, { x: -25, z: 25 }, { x: 25, z: 25 },
+      { x: -25, z: -25 }, { x: 32, z: -20 }, { x: -25, z: 25 }, { x: 25, z: 25 },
     ].filter(p => !(Math.abs(p.x) < 8 && Math.abs(p.z) < 8));
     const treePositions = isMobile ? allTreePos.slice(0, 4) : allTreePos;
 
@@ -1258,7 +1258,7 @@ export class WorldBuilder {
       { x: 28, z: 32, text: 'TOYS', color: 0xFFCC55 },
       { x: -28, z: 32, text: 'CAFE', color: 0x77DD88 },
       { x: -28, z: -28, text: 'FIND', color: 0xCC88FF },
-      { x: 23, z: -23, text: 'GROW', color: 0x44FF88 },
+      { x: 20, z: -18, text: 'GROW', color: 0x44FF88 },
     ];
 
     for (const def of signDefs) {
